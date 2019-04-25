@@ -10,13 +10,28 @@ using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.Diagnostics;
 using System.IO;
-using System.IO.Pipes;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Newtonsoft.Json.Linq;
 
 namespace MockLanguageExtension
 {
+    public class CustomMessageTarget
+    {
+        [JsonRpcMethod("changed")]
+        public void OnTextDocumentChanged(JToken arg)
+        {
+            Debug.WriteLine(arg);
+        }
+
+        [JsonRpcMethod("open")]
+        public void TextDocumentDidChange(JToken arg)
+        {
+            Debug.WriteLine(arg);
+        }
+    }
+
     [ContentType("foo")]
     [Export(typeof(ILanguageClient))]
     public class FooLanguageClient : ILanguageClient, ILanguageClientCustomMessage
@@ -31,6 +46,7 @@ namespace MockLanguageExtension
         public FooLanguageClient()
         {
             Instance = this;
+            CustomMessageTarget = new CustomMessageTarget();
         }
 
         internal static FooLanguageClient Instance
@@ -61,38 +77,36 @@ namespace MockLanguageExtension
 
         public object MiddleLayer => null;
 
-        public object CustomMessageTarget => null;
+        public object CustomMessageTarget { get; }
 
         public async Task<Connection> ActivateAsync(CancellationToken token)
         {
-            ProcessStartInfo info = new ProcessStartInfo();
-            var programPath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "Server", @"LanguageServerWithUI.exe");
-            info.FileName = programPath;
-            info.WorkingDirectory = Path.GetDirectoryName(programPath);
+            await System.Threading.Tasks.Task.Yield();
+            Connection connection = null;
 
-            var stdInPipeName = @"output";
-            var stdOutPipeName = @"input";
+            var assembly = Assembly.GetAssembly(typeof(FooLanguageClient));
+            var fileName = Path.Combine(Path.GetDirectoryName(assembly.Location), @"server.exe");
+            var arguments = @"--stdio --nolazy";
 
-            var pipeAccessRule = new PipeAccessRule("Everyone", PipeAccessRights.ReadWrite, System.Security.AccessControl.AccessControlType.Allow);
-            var pipeSecurity = new PipeSecurity();
-            pipeSecurity.AddAccessRule(pipeAccessRule);
-
-            var bufferSize = 256;
-            var readerPipe = new NamedPipeServerStream(stdInPipeName, PipeDirection.InOut, 4, PipeTransmissionMode.Message, PipeOptions.Asynchronous, bufferSize, bufferSize, pipeSecurity);
-            var writerPipe = new NamedPipeServerStream(stdOutPipeName, PipeDirection.InOut, 4, PipeTransmissionMode.Message, PipeOptions.Asynchronous, bufferSize, bufferSize, pipeSecurity);            
-
-            Process process = new Process();
-            process.StartInfo = info;
+            var process = new System.Diagnostics.Process()
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = fileName,
+                    Arguments = arguments,
+                    RedirectStandardInput = true,
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = false
+                }
+            };
 
             if (process.Start())
             {
-                await readerPipe.WaitForConnectionAsync(token);
-                await writerPipe.WaitForConnectionAsync(token);
+                connection = new Connection(process.StandardOutput.BaseStream, process.StandardInput.BaseStream);
+            }
 
-                return new Connection(readerPipe, writerPipe);
-        }
-
-            return null;
+            return connection;
         }
 
         public async System.Threading.Tasks.Task AttachForCustomMessageAsync(JsonRpc rpc)

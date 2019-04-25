@@ -1,0 +1,17 @@
+{
+  "name": "mocklanguageextension",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js",
+    "package": "pkg server.js --targets node8-win-x86 --output server.exe"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "pkg": "4.3.7",
+    "vscode-languageserver": "5.2.1"
+  }
+}
