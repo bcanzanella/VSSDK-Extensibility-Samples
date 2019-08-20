@@ -53,6 +53,8 @@ namespace LanguageServer
 
         public void OnTextDocumentOpened(DidOpenTextDocumentParams messageParams)
         {
+            this.rpc.NotifyAsync("my/method");
+
             this.textDocument = messageParams.TextDocument;
             
             SendDiagnostics();

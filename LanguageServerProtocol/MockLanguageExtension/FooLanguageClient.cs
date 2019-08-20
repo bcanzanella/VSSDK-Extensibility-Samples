@@ -17,6 +17,15 @@ using System.Threading.Tasks;
 
 namespace MockLanguageExtension
 {
+    public class MyCustomMessageTarget
+    {
+        [JsonRpcMethod("my/method")]
+        public void MyMethod()
+        {
+            System.Diagnostics.Debugger.Break();
+        }
+    }
+
     [ContentType("foo")]
     [Export(typeof(ILanguageClient))]
     public class FooLanguageClient : ILanguageClient, ILanguageClientCustomMessage
@@ -61,7 +70,7 @@ namespace MockLanguageExtension
 
         public object MiddleLayer => null;
 
-        public object CustomMessageTarget => null;
+        public object CustomMessageTarget => new MyCustomMessageTarget();
 
         public async Task<Connection> ActivateAsync(CancellationToken token)
         {
